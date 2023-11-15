@@ -2,6 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
+<link rel="manifest" href="./app.webmanifest" crossorigin="use-credentials" />
 <style>
     body {
         background: #888;
@@ -33,6 +34,20 @@
         left: 50%;
         transform: translate(-50%, -50%);
         border-radius: 0;
+    }
+    body.app {
+        background: #000;
+        margin: 0;
+    }
+    .app #canvas {
+        border-radius: 0;
+    }
+    body.app #ui {
+        display: none;
+    }
+    .app #help {
+        display: block;
+        color: white;
     }
 </style>
 <script src="Smalltalk78.js"></script>
@@ -106,6 +121,17 @@ Ctrl-d  done with eval
 </p>
 
 <script>
+    if (!navigator.serviceWorker.controller) {
+        navigator.serviceWorker.register("./sw.js");
+    };
+    addEventListener("appinstalled", (event) => {
+        const matchMediaStandalone = matchMedia("(display-mode: standalone)");
+        matchMediaStandalone.addEventListener("change", () => {
+            // Reload as app
+            window.navigation.reload();
+        }, {once: true});
+    }, {once: true});
+
     const Images = {
         "smalltalkzoo": "https://smalltalkzoo.thechm.org/images/updated.st78",
         "updateLevel-346": "images/updateLevel-346.st78",
@@ -115,7 +141,7 @@ Ctrl-d  done with eval
         "updateLevel-363_1003": "images/updateLevel-363_1003.st78",
     };
     const imageKeyToLoad = "updateLevel-363_1003";
-    let width, height, fullscreen, black, white;
+    let width, height, fullscreen, app, black, white;
     const params = new URL(window.location.href).searchParams;
     if (params.has("alto")) {
         width = 608;
@@ -127,6 +153,7 @@ Ctrl-d  done with eval
     if (params.get("width")) width = +params.get("width");
     if (params.get("height")) height = +params.get("height");
     if (params.has("fullscreen")) fullscreen = true;
+    app = isRunningAsApp();
     if (params.has("black")) black = +("0xFF" + params.get("black"));
     if (params.has("white")) white = +("0xFF" + params.get("white"));
 
@@ -135,6 +162,15 @@ Ctrl-d  done with eval
     if (fullscreen) {
         body.classList.add("fullscreen");
         if (black) body.style.backgroundColor = "#" + black.toString(16).slice(-6);
+    }
+
+    if (app) {
+        body.classList.add("app");
+        if (black) body.style.backgroundColor = "#" + black.toString(16).slice(-6);
+        width = document.documentElement.clientWidth;
+        height = document.documentElement.clientHeight;
+        canvas.width = width;
+        canvas.height = height;
     }
 
     module("main").requires("Smalltalk78").toRun(function() {
@@ -174,6 +210,10 @@ Ctrl-d  done with eval
         link.click();
         URL.revokeObjectURL(url);
         link.remove();
+    }
+
+    function isRunningAsApp() {
+        return window.matchMedia("(display-mode: standalone)").matches;
     }
 </script>
 
