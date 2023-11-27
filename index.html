@@ -102,7 +102,7 @@ Tab/Shift-Tab   indent/outdent selection
 Ctrl-]  do it in eval (Dispframe in the topleft corner)
 Ctrl-d  done with eval
 </pre>
-
+<input id="clipboardAccess" type="text" style="width:1px;height:1px;outline:0;position:absolute;top:-10px;left:-10px"/>
 </p>
 
 <script>
@@ -140,6 +140,18 @@ Ctrl-d  done with eval
         } else {
             help.style.display = 'block';
         }
+    }
+
+    const clipboardAccess = document.getElementById("clipboardAccess");
+    function captureClipboardEvent(type, listener) {
+        function handleCopyAndPasteEvent(event) {
+            clipboardAccess.blur();
+            listener(event, event.clipboardData);
+        }
+        clipboardAccess.addEventListener(type, handleCopyAndPasteEvent, {
+            once: true,
+        });
+        clipboardAccess.focus();
     }
 </script>
 

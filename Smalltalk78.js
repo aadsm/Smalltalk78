@@ -130,6 +130,65 @@ window.$world = {
 
 module("Smalltalk78").requires("users.codefrau.St78.vm").toRun(function() {
 
+const ntSymbolic = {
+    tab: 9,
+    cr: 13,
+    // Dispframe>>kbd
+    ctld: 132,
+    ctlw: 145,
+    ctlx: 151,
+    // TextImage>>classInit, kbd
+    bs: 8,
+    ctlw: 145, // delete word?
+    cut: 173,
+    paste: 158,
+    esc: 160,
+    // TextImage>>checkLooks
+    ctlb: 166, // bold
+    ctli: 150, // italic
+    ctlminus: 137,
+    ctlx: 151, // reset emph
+    ctlB: 230, // non-bold
+    ctlI: 214, // non-italic
+    ctlMinus: 201,
+    ctlX: 215, // reset emph
+    ctl0: 135, // font 0
+    ctl1: 159, // font 1
+    ctl2: 144, // font 2
+    ctl3: 143, // font 3
+    ctl4: 128, // font 4
+    ctl5: 127, // font 5
+    ctl6: 129, // font 6
+    ctl7: 131, // font 7
+    ctl8: 180, // font 8
+    ctl9: 149, // font 9
+    ctlShift0: 199, // font 10
+    ctlShift1: 223, // font 11
+    ctlShift2: 208, // font 12
+    ctlShift3: 207, // font 13
+    ctlShift4: 192, // font 14
+    ctlShift5: 191, // font 15
+    ctlt: 240, // toBravo
+    ctlf: 226, // fromBravo
+    // newly assigned
+    smaller: 228,
+    larger: 229,
+    doit: 130,
+    prompt: 167,
+    again: 134,
+    selectAll: 136,
+    compile: 138,
+    undo: 153,
+    cancel: 165,
+    left: 193,
+    right: 194,
+    up: 195,
+    down: 196,
+    pageUp: 197,
+    pageDown: 198,
+    home: 202,
+    end: 203,
+};
 //////////////////////////////////////////////////////////////////////////////
 // display & event setup
 //////////////////////////////////////////////////////////////////////////////
@@ -262,6 +321,66 @@ function createDisplay(canvas) {
         }
     }
 
+    function doKeyPaste() {
+        captureClipboardEvent("paste", function (evt, data) {
+            try {
+                display.clipboardString = data.getData("text");
+                // simulate paste keyboard event for St78
+                display.keys = []; //  flush other keys
+                recordKeyboardEvent(ntSymbolic["paste"]);
+                // now interpret until Smalltalk has read from the clipboard
+                display.clipboardStringChanged = true;
+                var start = Date.now();
+                while (
+                    display.clipboardStringChanged &&
+                    Date.now() - start < 500
+                )
+                    display.vm.interpret(20);
+                // if image has not used the clipboard prim, simulate key events
+                if (display.clipboardStringChanged) {
+                    console.log("No paste primitive, simulating keyboard");
+                    recordKeyboardEvent(8); // backspace
+                    for (var i = 0; i < display.clipboardString.length; i++) {
+                        var char = display.clipboardString.charCodeAt(i);
+                        for (var ntcode in NT.toUnicode) {
+                            var unicode = NT.toUnicode[ntcode].charCodeAt(0);
+                            if (char == unicode) {
+                                char = ntcode.charCodeAt(0);
+                                break;
+                            }
+                        }
+                        recordKeyboardEvent(char, true);
+                    }
+                }
+            } catch (err) {
+                show("display: paste error " + err);
+            }
+        });
+    }
+
+    function doKeyCopy() {
+        captureClipboardEvent("copy", function (evt, data) {
+            // simulate copy event for Smalltalk so it places text in clipboard
+            recordKeyboardEvent(ntSymbolic["cut"]);
+            // now interpret until Smalltalk has copied to< the clipboard
+            display.clipboardStringChanged = false;
+            var start = Date.now();
+            while (
+                !display.clipboardStringChanged &&
+                Date.now() - start < 500
+            ) {
+                display.vm.interpret(20 /*ms*/);
+            }
+            // got it, now copy to the system clipboard
+            try {
+                data.setData("text/plain", display.clipboardString);
+                evt.preventDefault();
+            } catch (err) {
+                show("display: copy error " + err);
+            }
+        });
+    }
+
     document.onkeydown = function(evt) {
         display.timeStamp = getTimeStamp(evt);
         var code, modifier;
@@ -294,9 +413,9 @@ function createDisplay(canvas) {
         if (evt.ctrlKey || evt.metaKey || evt.altKey) { // clipboard requires special handling
             var c = String.fromCharCode(evt.which);
             switch(c && c.toLowerCase()) {
-                // return false to let default handler do its magic
-                case 'c': doKeyCopy(evt); return false;
-                case 'v': doKeyPaste(evt); return false;
+                // return true to let default handler do its magic
+                case 'c': doKeyCopy(evt); return true;
+                case 'v': doKeyPaste(evt); return true;
             }
         }
         // regular cmd keys. TODO: Windows/Linux?
