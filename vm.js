@@ -3924,6 +3924,10 @@ Object.subclass('St78.vm.Primitives',
         // If the filename starts with http do a web get
         // if fileName is empty or ends in slash, answer array of files
         var result;
+        if (/^origin:/.test(fileName)) {
+            const origin = window.document.location.origin + "/";
+            fileName = fileName.replace(/^origin:\/\//, origin);
+        }
         if (/http(s)?:/.test(fileName)) {
             alertOK("fetching " + fileName);
             // we switched to https but the image may still use http
