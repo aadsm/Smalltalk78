@@ -61,5 +61,12 @@ UserView understands: 'bugScreenMenu | m w turtle i f index file
 
 UserView understands: 'primDownload [self croak] primitive: 300'
 
+UserView understands: 'download | log
+	[self currentDisplay: (Form new extent: 11 bits: ''--'' offset: nil).
+	self primDownload.
+	self restoredisplay.
+	self restartTicks.
+	self restore]'
+
 UserView classInit
 
