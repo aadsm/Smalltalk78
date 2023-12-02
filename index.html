@@ -153,6 +153,19 @@ Ctrl-d  done with eval
         });
         clipboardAccess.focus();
     }
+
+    function downloadBufferAs(buffer, filename) {
+        const blob = new Blob([buffer]);
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.style.display = 'none';
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        URL.revokeObjectURL(url);
+        link.remove();
+    }
 </script>
 
 </body>

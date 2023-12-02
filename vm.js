@@ -1297,6 +1297,14 @@ Object.extend(St78.vm.Image, {
             }
         }
     },
+    downloadBufferAs: function (buffer, filename, thenDo, elseDo) {
+        try {
+            window.downloadBufferAs(buffer, filename);
+            if (thenDo) thenDo();
+        } catch (e) {
+            if (elseDo) elseDo(e.msg);
+        }
+    }
 });
 
 Object.subclass('St78.vm.Object',
@@ -2994,6 +3002,7 @@ Object.subclass('St78.vm.Primitives',
             case 211: return this.popNandPushIfOK(2, this.makeLargeIfNeeded(this.stackLargeInt(0) - this.stackLargeInt(1))); // primitiveSubtractLargeIntegers
             case 214: {var a = this.stackLargeInt(0), b = this.stackLargeInt(1); return this.popNandPushIfOK(2, a < b ? 1 : a === b ? 2 : 3)}; // primitiveCompareLargeInt
             case 240: return this.popNandPushFloatIfOK(argCount + 1, this.pathDistance(argCount)); // primitive Dollar1 pathLength
+            case 300: return this.primitiveDownloadImage(argCount);
 
         }
         throw "primitive " + index + " not implemented yet";
@@ -3551,6 +3560,24 @@ Object.subclass('St78.vm.Primitives',
             if (!imageName) return alert("not saved");
             St78.vm.Image.saveBufferAs(buffer, imageName);
         }, imageName);
+        return true;
+    },
+    primitiveDownloadImage: function(argCount) {
+        this.vm.pushPCBP();
+        var process = this.vm.sleepProcess();
+        var buffer = this.vm.image.writeToBuffer();
+        this.vm.wakeProcess(process);
+        this.vm.popPCBP();
+
+        let imageName = window.localStorage["notetakerImageName"] || "default.st78";
+        imageName = imageName.replace(/\.st78/, "");
+        const date = new Date();
+        const formattedDate = `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
+        const filename = `${imageName} (${formattedDate}).st78`;
+        $world.prompt("Download image as", function(filename) {
+            if (!filename) return;
+            St78.vm.Image.downloadBufferAs(buffer, filename);
+        }, filename);
         return true;
     },
     primitiveExitToDebugger: function(argCount) {
