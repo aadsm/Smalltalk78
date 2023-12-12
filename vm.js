@@ -4131,17 +4131,28 @@ Object.subclass('St78.vm.BitBlt',
                     bitsOop.bytes = new Uint8Array(bitsOop.bytes);
                 // make a dataview on the same data buffer
                 var bytesAsWords = new DataView(bitsOop.bytes.buffer);
+                if (bytesAsWords.byteLength % 2 === 1) {
+                    console.warn("Buffer size not even! shouldn't be used to get 2 byte words. This is a bug.");
+                    console.log("bytesAsWords.byteLength", bytesAsWords.byteLength);
+                    debugger;
+                }
                 bitsOop.bitBltAcccessor = {
-                    getWord: function(index) {
-                        if (index >= 0 && index * 2 < bytesAsWords.byteLength)
+                    getWord: function (index) {
+                        if (
+                            index >= 0 &&
+                            index * 2 < bytesAsWords.byteLength - 1
+                        )
                             return bytesAsWords.getUint16(index * 2);
                         else return 0;
                     },
-                    setWord: function(index, value) {
-                        if (index >= 0 && index * 2 < bytesAsWords.byteLength)
+                    setWord: function (index, value) {
+                        if (
+                            index >= 0 &&
+                            index * 2 < bytesAsWords.byteLength - 1
+                        )
                             bytesAsWords.setUint16(index * 2, value);
-                    }
-                }
+                    },
+                };
             }
         }
         return bitsOop.bitBltAcccessor;
