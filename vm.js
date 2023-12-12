@@ -2534,34 +2534,46 @@ Object.subclass('St78.vm.Interpreter',
     },
     sleepProcess: function() {
         // Preserve state of sp in variable 'top' (after saving PC and BP)
-        this.activeProcessPointers[NT.PI_PROCESS_TOP] = (this.activeProcessPointers.length - this.sp) - 1;
+        this.updateProcessTopField();
         return this.activeProcess;
     },
     wakeProcess: function(proc) {
         // Install a new active process and load sp, ready to restore other state
         this.activeProcess = proc;
         this.activeProcessPointers = this.activeProcess.pointers;
-        this.sp = (this.activeProcessPointers.length - this.activeProcessPointers[NT.PI_PROCESS_TOP]) - 1;
+        this.sp = this.getProcessTopField();
     },
 },
 'stack access', {
+    // Needed because Object>>error relies on process top field being correct.
+    updateProcessTopField: function () {
+        this.activeProcessPointers[NT.PI_PROCESS_TOP] =
+        (this.activeProcessPointers.length - this.sp) - 1;
+    },
+    getProcessTopField: function () {
+        return (this.activeProcessPointers.length - this.activeProcessPointers[NT.PI_PROCESS_TOP]) - 1;
+    },
     pop: function() {
         var value = this.activeProcessPointers[this.sp];
         this.activeProcessPointers[this.sp++] = this.nilObj;
+        this.updateProcessTopField();
         return value;
     },
     popN: function(nToPop) {
         for (var i = 0; i < nToPop; i++)
             this.activeProcessPointers[this.sp++] = this.nilObj;
+        this.updateProcessTopField();
         return true;
     },
     push: function(oop) {
         this.activeProcessPointers[--this.sp] = oop;
+        this.updateProcessTopField();
     },
     popNandPush: function(nToPop, oop) {
         for (var i = 1; i < nToPop; i++)
             this.activeProcessPointers[this.sp++] = this.nilObj;
         this.activeProcessPointers[this.sp] = oop;
+        this.updateProcessTopField();
         return true;
     },
     top: function() {
@@ -2619,6 +2631,7 @@ Object.subclass('St78.vm.Interpreter',
         this.primHandler.clearAtCache(); // might have cached process size
         if (this.activeProcess.oop >= 0) // is in old space
             this.image.oldSpaceBytes += this.activeProcess.totalBytes() - totalBytesBefore;
+        this.updateProcessTopField();
         return true;
     },
 },
