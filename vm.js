@@ -2822,13 +2822,13 @@ Object.subclass('St78.vm.Interpreter',
             numArgs = ctx[bp + NT.FI_NUMARGS],
             numTemps = ctx[bp + NT.FI_METHOD].methodNumTemps();
         var stack = '';
-        if (debugFrame) stack += Strings.format("\npc: %s sp: %s bp: %s numArgs: %s\n",
+        stack += Strings.format("\npc: %s sp: %s bp: %s numArgs: %s\n",
             this.pc, this.sp, this.bp, numArgs);
-        for (var i = this.sp; i < ctx.length; i++) {
-            if (!debugFrame && bp + NT.FI_SAVED_BP <= i && bp + NT.FI_RECEIVER > i) continue;
+        for (var i = Math.max(this.sp, NT.PN_PROCESS); i < ctx.length; i++) {
+            // if (!debugFrame && bp + NT.FI_SAVED_BP <= i && bp + NT.FI_RECEIVER > i) continue;
             var obj = ctx[i];
             var value = obj && obj.stInstName ? obj.stInstName(32) : obj;
-            stack += Strings.format('\n[%s] %s%s', i,
+            stack += Strings.format('\n[%s(◦%s)] %s%s', i, i - NT.PN_PROCESS,
                 bp + NT.FI_FIRST_TEMP - numTemps < i && i <= bp + NT.FI_FIRST_TEMP
                     ? ('temp' + (bp-1+numArgs-i) + '/t' + (bp+numArgs-i) + ': ') :
                 bp + NT.FI_SAVED_BP === i ? ' savedBP: ' :
@@ -2840,7 +2840,19 @@ Object.subclass('St78.vm.Interpreter',
                 bp + NT.FI_RECEIVER < i && i <= bp + NT.FI_RECEIVER + numArgs
                     ? (' arg' + (bp+5+numArgs-i) + '/t' + (bp+6+numArgs-i) + ': ') :
                 sp === i ? '   sp ==> ' :
-                '          ', value);
+                                                    '          ', value);
+            if (bp + NT.FI_METHOD === i) {
+                stack += `: ${this.printMethod(ctx[bp + NT.FI_METHOD])}`;
+            } else if (bp + NT.FI_CALLER_PC === i && ctx[bp + NT.FI_SAVED_BP] > 0) {
+                const callerBP = bp + ctx[bp + NT.FI_SAVED_BP] + 1;
+                const callerMethod = ctx[callerBP + NT.FI_METHOD];
+                const printer = new St78.vm.InstructionPrinter(callerMethod, this);
+                const effectivePC = value - NT.PC_BIAS;
+                const sendCallerPC = effectivePC - 1;
+                stack += ` (${effectivePC} w/b)`;
+                stack += ` [${printer.printInstruction(sendCallerPC)}]`;
+            }
+
             if (i >= bp + NT.FI_RECEIVER + numArgs && i+1 < ctx.length) {
                 if (!printAll) return stack;
                 sp = bp + NT.FI_LAST_ARG + numArgs;
@@ -4500,6 +4512,34 @@ Object.subclass('St78.vm.InstructionPrinter',
     	while (this.scanner.pc < end)
         	this.scanner.interpretNextInstructionFor(this);
         return this.result;
+    },
+    printInstruction: function (pc, indent, highlight, highlightPC) {
+        // all args are optional
+        this.indent = indent;           // prepend to every line except if highlighted
+        this.highlight = highlight;     // prepend to highlighted line
+        this.highlightPC = highlightPC; // PC of highlighted line
+        if (!this.method.isCompiledMethod())
+            return "<not a CompiledMethod>";
+        this.result = '';
+        this.scanner = new St78.vm.InstructionStream(this.method, this.vm);
+        this.oldPC = this.scanner.pc;
+        const start = this.method.methodStartPC();
+        const end = this.method.methodEndPC();
+        let startPC = pc || start;
+        if (pc < start) {
+            pc = start;
+        } else if (pc > end) {
+            pc = end;
+        }
+        // interpret all instructions until we get to the desired pc.
+        while (this.scanner.pc < startPC) {
+            this.scanner.interpretNextInstructionFor(this);
+        }
+        this.result = '';
+        this.scanner.interpretNextInstructionFor(this);
+        return this.result
+            // .replace(/^\d+ /, "") // get rid of the PC at the front of the line.
+            .trimEnd();
     },
     print: function(instruction) {
         if (this.oldPC === this.highlightPC) {
