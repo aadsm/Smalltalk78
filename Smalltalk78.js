@@ -509,6 +509,7 @@ function runImage(buffer, imageName, canvas) {
     var display = createDisplay(canvas),
         image = St78.vm.Image.readFromBuffer(buffer, imageName);
     Smalltalk78.vm = new St78.vm.Interpreter(image, display);
+    window.VM = Smalltalk78.vm;
     window.onbeforeunload = function() {
         return "Smalltalk78 is still running";
     };
