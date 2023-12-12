@@ -2439,8 +2439,10 @@ Object.subclass('St78.vm.Interpreter',
             this.breakOnFrameChanged = false;
             this.breakNow();
         }
-        if (this.sp > this.lowStackSize)
-            this.lowStackSignaled = false;
+        // It's useless to be constantly notifying the lack of stack
+        // when the sp is going up and down the lowStackSize.
+        // if (this.sp > this.lowStackSize)
+        //     this.lowStackSignaled = false;
     },
     doQuickSend: function(obj, index) {
         // pop receiver, push self or my inst var at index
@@ -2597,15 +2599,14 @@ Object.subclass('St78.vm.Interpreter',
         this.popNandPush(2, boolResult ? this.trueObj : this.falseObj);
         return true;
     },
-    handleLowStack: function() {
+    handleLowStack: function () {
+        if (this.lowStackSignaled) {
+            // we already checked it can't grow larger.
+            return;
+        }
         if (this.growStack())
             return;
-        if (!this.lowStackSignaled) {
-            this.lowStackSignaled = true;
-            this.push(this.primHandler.makeStString('stack space is low'));
-            this.push(this.receiver);
-            this.send(this.image.selectorNamed('error:'), 1);
-        }
+        this.lowStackSignaled = true;
     },
     growStack: function() {
         var delta = 500,
@@ -2613,8 +2614,10 @@ Object.subclass('St78.vm.Interpreter',
             oldPointers = this.activeProcess.pointers,
             oldLength = oldPointers.length,
             newLength = oldLength + delta;
-        if (newLength - NT.PI_PROCESS_STACK > this.maxStackSize)
+        if (newLength - NT.PI_PROCESS_STACK > this.maxStackSize) {
+            console.warn(`Can't grow stack from ${oldLength} to ${newLength}. Max stack size is ${this.maxStackSize}. Only ${this.sp - NT.PI_PROCESS_STACK} bytes available on the stack`);
             return false; // refuse to grow larger
+        }
         console.log("Growing stack to " + (newLength - NT.PI_PROCESS_STACK));
         var newPointers = [];
         for (var i = 0; i < NT.PI_PROCESS_STACK; i++)
