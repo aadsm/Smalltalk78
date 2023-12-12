@@ -2694,16 +2694,25 @@ Object.subclass('St78.vm.Interpreter',
     },
 },
 'debugging', {
-    printMethod: function(aMethod) {
+    printMethod: function (aMethod) {
         // return a 'class>>selector' description for the method
         // in old images this is expensive, we have to search all classes
+        function getPrintMethodValue() {
+            return `${aMethod.cacheClassName ?? "?"}>>${aMethod.cacheSelectorName ?? "?"}`;
+        }
         if (!aMethod) aMethod = this.method;
-        var found;
+        if (aMethod.cacheClassName || aMethod.cacheSelectorName) {
+            return getPrintMethodValue();
+        }
         this.allMethodsDetect(function(classObj, methodObj, selectorObj) {
-            if (methodObj === aMethod)
-                return found = classObj.className() + '>>' + selectorObj.bytesAsUnicode();
+            if (methodObj === aMethod) {
+                aMethod.cacheClassName = classObj.className();
+                aMethod.cacheSelectorName = selectorObj.bytesAsUnicode();
+                return true;
+            }
         });
-        return found || "?>>?";
+
+        return getPrintMethodValue();
     },
     allMethodsDetect: function(callback) {
         // callback(classObj, methodObj, selectorObj) should return true to break out of iteration
