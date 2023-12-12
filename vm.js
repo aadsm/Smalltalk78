@@ -2050,6 +2050,11 @@ Object.subclass('St78.vm.Interpreter',
     interpretOne: function() {
         var b, b2;
         this.byteCodeCount++;
+        if (this.bp === this.breakBP && this.pc >= this.breakPC) {
+            this.breakBP = null;
+            this.breakPC = null;
+            this.breakNow(`Brake on PC=${this.pc}`);
+        }
         b = this.nextByte();
         if (b < 128) // Chrome only optimized up to 128 cases
         switch (b) { /* The Main Bytecode Dispatch Loop */
@@ -2770,6 +2775,11 @@ Object.subclass('St78.vm.Interpreter',
     breakNow: function(msg) {
         if (msg) console.log("Break: " + msg);
         this.breakOutOfInterpreter = 'break';
+    },
+    breakOnPC: function (pc) {
+        this.breakPC = pc;
+        this.breakBP = this.bp
+        this.breakMethod = this.method;
     },
     breakOnReturn: function() {
         this.breakOnFrameChanged = false;
