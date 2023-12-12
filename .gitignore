@@ -1,3 +1,6 @@
 decompiled
 assets
-
+.DS_Store
+world-serialization.json
+.editorconfig
+.prettierignore
