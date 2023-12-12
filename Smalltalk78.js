@@ -475,14 +475,31 @@ function createDisplay(canvas) {
 // main loop
 //////////////////////////////////////////////////////////////////////////////
 
+function runNextCycle(ms) {
+    if (ms > 0) {
+        setTimeout(interpretLoop, ms);
+    } else {
+        requestAnimationFrame(interpretLoop);
+    }
+}
+
+function handleBreak() {
+    const VM = Smalltalk78.vm;
+    console.log(VM.printActiveProcess(true));
+    return false;
+}
+
 function interpretLoop() {
     try {
-        Smalltalk78.vm.interpret(20, function(ms) {
-            if (ms > 0) setTimeout(interpretLoop, ms);
-            else        requestAnimationFrame(interpretLoop);
-        });
+        const result = Smalltalk78.vm.interpret(20, runNextCycle);
+        if (result === 'break') {
+            if (handleBreak()) {
+                debugger;
+            }
+        }
     } catch(error) {
         console.error(error);
+        console.log(VM.printActiveProcess(true));
         alert(error);
     }
 }
