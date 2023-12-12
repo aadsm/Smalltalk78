@@ -2015,7 +2015,19 @@ Object.subclass('St78.vm.Interpreter',
         this.breakOnMethod = null; // method to break on
         this.breakOnFrameChanged = false;
         this.breakOnFrameReturned = null; // context to break on
+        const errorHandlingMethods = [
+            this.specialObjects[0],
+            // this.findMethod("UserView>>notifyNT:"),
+            // this.findSelectorInClass(this.image.selectorNamed('error:'), 1, this.nilObj.stClass).method
+        ]
+        this.errorHandlingMethodBPs = Object.create(null); // avoids going up the prototype chain.
+        for (const method of errorHandlingMethods) {
+            this.errorHandlingMethodBPs[method.oop] = 0;
+        }
+        this.lastErrorHandlingBP = 0;
+        console.log(this.errorHandlingMethodBPs);
         this.startupTime = Date.now(); // base for millisecond clock
+        // this.breakOn("Object>>error");
     },
     loadInitialContext: function(display) {
         this.wakeProcess(this.image.userProcess);  // set up activeProcess and sp
@@ -2379,9 +2391,55 @@ Object.subclass('St78.vm.Interpreter',
         }
         return this.nilObj;
     },
+    checkForErrorInfiniteLoop(newMethod) {
+        // Catch error handling methods here to guard against infinite
+        // loops (and stack overflow) when there's an error in the error
+        // handling code.
+        if (newMethod.oop in this.errorHandlingMethodBPs) {
+            const errorMethodBP = this.errorHandlingMethodBPs[newMethod.oop]
+            if (errorMethodBP && this.bp < errorMethodBP) {
+                console.warn("The error handling code seems to be crashing and sending the VM on an infinite loop. Please check where it's failing and fix it.");
+                // Crude way to infer/heurstic
+                // NumArgs === 0 => Object>>error
+                // NumArgs === 1 => Object>>error: || UserView>>notifyNT:
+                let errorMessage;
+                // This newMethod frame hasn't been pushed yet, so we we're
+                // still at the BP & PC that caused the error.
+                const method = this.activeProcessPointers[this.bp + NT.FI_METHOD]
+                const numArgs = newMethod.methodNumArgs();
+                if (numArgs === 0) {
+                    const receiver = this.activeProcessPointers[this.bp + NT.FI_RECEIVER];
+                    const sendInstr = method.bytes[this.pc - 1];
+                    const selector = this.methodLiteral(sendInstr - 0xd0);
+                    errorMessage = `"Message ${selector} not understood by stClass(${receiver.stClass.className()})."`;
+                    const fullMessageError = `${errorMessage}\n\n` + this.printMethod(method) + "\n" + this.printByteCodes(method, "    ", "--> ", this.pc - 1);
+                } else {
+                    // Case for Object>>error: || UserView>>notifyNT:
+                    // Get the errorMessage from the arg0.
+                    errorMessage = this.activeProcessPointers[this.bp + NT.FI_LAST_ARG].bytesAsUnicode();
+                }
+                const fullMessageError = `"${errorMessage}"\n\n` + this.printMethod(method) + "\n" + this.printByteCodes(method, "    ", "--> ", this.pc - 1);
+                console.log(VM.printStack().split("\n").reverse().join("\n"));
+                throw `Failed to report an error:\n${fullMessageError}`;
+            } else {
+                this.errorHandlingMethodBPs[newMethod.oop] = this.bp;
+                this.erroHandlingRunning = true;
+                this.lastErrorHandlingBP = this.bp;
+            }
+        } else if (this.lastErrorHandlingBP && this.bp >= this.lastErrorHandlingBP) {
+            for (const [method, errorMethodBP] of Object.entries(this.errorHandlingMethodBPs)) {
+                if (this.bp <= errorMethodBP) {
+                    this.errorHandlingMethodBPs[method] = 0;
+                } else {
+                    this.lastErrorHandlingBP = Math.min(this.lastErrorHandlingBP, errorMethodBP)
+                }
+            }
+            this.lastErrorHandlingBP = Math.min(Object.values(this.errorHandlingMethodBPs))
+        }
+    },
     executeNewMethod: function(newRcvr, newMethod, newMethodClass, argumentCount, primitiveIndex, overrideReceiver) {
         this.sendCount++;
-        if (this.logSends) console.log(this.sendCount + ' ' + this.printMethod(newMethod));
+        this.checkForErrorInfiniteLoop(newMethod);
         if (this.breakOnMethod === newMethod) this.breakNow("executing method " + this.printMethod(newMethod));
         if (this.breakOnFrameChanged) {
             this.breakOnFrameChanged = false;
